@@ -163,3 +163,4 @@ cython_debug/
 .idea/
 poetry.lock
 src/git_analysis_results.db
+src/diretorio_local_repositorio/

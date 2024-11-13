@@ -2,46 +2,25 @@ import os
 import shutil
 from datetime import datetime
 
-from flask import Flask, request
 import git
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
+from flask import request
+from sqlalchemy import engine, create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
 
-#Inicializando o Flask
-app = Flask(__name__)
+from src.models.git_analysis_result import Base, GitAnalysisResult
 
-#definindo a classe base do SQLAlchemy
-Base = declarative_base()
-
-#definindo a classe para armazenar os resultados de analise
-class GitAnalysisResult(Base):
-    __tablename__ = 'git_analysis_results'
-
-    id = Column(Integer, primary_key=True)
-    author = Column(String)
-    analyze_date = Column(DateTime)
-    average_commits = Column(Float)
-    repository_url = Column(String)
-    repository_name = Column(String)
-
-#configura o banco sqlite
 engine = create_engine('sqlite:///git_analysis_results.db')
 
-# cria as tabelas no banco de dados
-Base.metadata.create_all(engine)
+def get_repository_status():
+    Base.metadata.create_all(engine)
 
-#cria uma sessao para interagir com o banco
-Session = sessionmaker(bind=engine)
-session = Session()
+    Session = sessionmaker(bind=engine)
+    session = Session()
 
-@app.route('/analisador-git', methods=['GET'])
-def git_analysis():
-    # Define a URL do repositório
     usuario = request.args.get('usuario')
     repositorio = request.args.get('repositorio')
 
-    #verifica se algum dos parâmetros é está vazio
+    # verifica se algum dos parâmetros é está vazio
     if usuario is None:
         raise ValueError("Usuario nao pode ser none")
     if repositorio is None:
@@ -96,7 +75,7 @@ def git_analysis():
     # Retorna o total de commits e a média de commits por dia por desenvolvedor
     for autor, commits in commits_por_desenvolvedor.items():
         dias = len(dias_por_desenvolvedor[autor])
-        media_commits_por_dia = commits/dias
+        media_commits_por_dia = commits / dias
         response += f'{autor} realizou {commits} commits com uma média de {media_commits_por_dia:.2f} commits por dia.<br>'
 
         # Cria todas as tabelas se não existir
@@ -119,24 +98,21 @@ def git_analysis():
 
     return response
 
-@app.route('/analisador-git/buscar', methods=['GET'])
-def buscar_medias_de_commit():
+def get_commits_average():
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
     autor1 = request.args.get('autor1')
     autor2 = request.args.get('autor2')
     autor3 = request.args.get('autor3')
     autores = [autor1, autor2, autor3]
-
-    engine = create_engine('sqlite:///git_analysis_results.db')
-    Session = sessionmaker(bind=engine)
-    session = Session()
 
     resultados = []
     for autor in autores:
         for registro in session.query(GitAnalysisResult).filter(GitAnalysisResult.author.ilike(f"%{autor}%")).all():
             resultados.append(f'{registro.author} possui uma média de {registro.average_commits:.2f} commits por dia.')
 
-    resultados_nao_duplicados = set(resultados)  # Removendo resultados repetidos do banco de dados
+    resultados_nao_duplicados = set(resultados)
     return "<br>".join(resultados_nao_duplicados)
-
-if __name__ == '__main__':
-    app.run(debug=True)
